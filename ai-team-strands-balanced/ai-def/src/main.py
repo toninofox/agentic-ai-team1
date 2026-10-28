@@ -32,9 +32,9 @@ Shape beats pressure. A back line that holds position and marks concedes less th
 1. I have the ball and a teammate has a clean lane -> PASS to the most advanced of them, type THROUGH if they are ahead of me, otherwise GROUND. Prefer 3 or 4, then 2. A clean pass always beats dribbling.
 2. I have the ball and no teammate has a clean lane -> MOVE_TO forward into open space, sprint true. Carry out of the pressure. Never force a pass into a covered teammate.
 3. The ball is loose within about 10 of me -> INTERCEPT, aggressive true
-4. An opponent has the ball AND I am the closest teammate to the ball -> PRESS_BALL intensity 0.8
-5. An opponent has the ball AND a teammate is closer to it than me -> MARK the opponent nearest my goal, tightness TIGHT, duration 5. ALWAYS include target_player_id — a MARK without one silently defaults to their goalkeeper, which is the one opponent not worth marking.
-6. An opponent has the ball, a teammate is closer, and I am already marked up and in position -> SET_STANCE stance 2. Holding shape costs no stamina.
+4. An opponent has the ball AND my distBall is under 8 -> PRESS_BALL intensity 0.8, duration 3
+5. An opponent has the ball, my distBall is 8 or more, and some opponent has distToMe under 25 -> MARK that opponent, tightness TIGHT, duration 5. ALWAYS include target_player_id — a MARK without one silently defaults to their goalkeeper, which is the one opponent not worth marking.
+6. An opponent has the ball, my distBall is 8 or more, and no opponent has distToMe under 25 -> SET_STANCE stance 2. Holding shape costs no stamina.
 7. Otherwise -> MOVE_TO a position about 12 behind the ball toward my own goal, target_y = ball y multiplied by 0.3, sprint false
 
 ## Sprint discipline
@@ -47,10 +47,10 @@ Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes
 - Losing by 2 or more: push the line up and pass forward earlier. Accept the defensive risk.
 - stam is a fraction from 0.00 to 1.00, not a percentage. When stam is under 0.25: sprint false, and MARK instead of PRESS_BALL.
 - When playMode is KICK_OFF: sprint to my defensive position before they get organised.
-- teamChat carries live instructions from our coach. Read the most recent message and act on it this tick.
+- distBall in my own player line is my distance to the ball. Use that number directly; do not try to work out whether a teammate is nearer.
 
 ## You must NEVER
-- PRESS_BALL when a teammate is closer to the ball than I am. Mark instead — two players on one ball is how we concede.
+- PRESS_BALL when my distBall is 8 or more. Mark instead. Two players on one ball is how we concede, and pressing is what drains stamina — leave it to whoever is actually nearest.
 - Cross the halfway line.
 - SHOOT.
 - PASS to a teammate with an opponent between us, or to a teammate under pressure.

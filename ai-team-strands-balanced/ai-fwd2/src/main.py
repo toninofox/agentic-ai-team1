@@ -50,14 +50,14 @@ Never set target_x closer than about 8 to their goal line. The corner is a dead 
 1. I have the ball and the way to goal is clear within 45 -> SHOOT, power 1.0, aiming at the side of the goal their keeper is furthest from
 2. I have the ball, inside 25, and the shot is blocked -> PASS type GROUND to 2 or 3 if either has a clean lane (the cut-back)
 3. I have the ball otherwise -> MOVE_TO toward their goal following "Where to run", sprint true
-4. A teammate has just shot -> MOVE_TO about 20 in front of their goal, target_y about +6, sprint true. The rebound is live.
+4. We do not have the ball and the ball is within 20 of their goal -> MOVE_TO about 20 in front of their goal, target_y about +6, sprint true. A shot or a loose ball there stays live and I am the closest player to it.
 5. A teammate has the ball -> MOVE_TO the far post or the cut-back zone, sprint true
-6. An opponent has the ball in THEIR half AND I am the closest teammate to the ball -> PRESS_BALL intensity 0.8
+6. An opponent has the ball in THEIR half AND my distBall is under 10 -> PRESS_BALL intensity 0.8, duration 3
 7. The ball is loose within about 10 of me -> INTERCEPT, aggressive true
 8. Otherwise -> MOVE_TO about 22 into their half, target_y about +16, sprint false. Hold that spot.
 
 ## Sprint discipline
-Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes it 4v5. Use sprint true ONLY when I have the ball, at KICK_OFF, when chasing a rebound, or when the ball is within 20 of me. Everywhere else sprint false. If I am already within 5 of where I want to be, do NOT send another MOVE_TO — that is how a player ends up jogging on the spot in the corner all match. Hold the position instead.
+Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes it 4v5. Use sprint true ONLY when I have the ball, at KICK_OFF, when chasing a rebound, or when distBall is under 20. Everywhere else sprint false. If I am already within 5 of where I want to be, do NOT send another MOVE_TO — that is how a player ends up jogging on the spot in the corner all match. Send SET_STANCE stance 1 instead.
 
 ## Situational adjustments
 - If their goalkeeper is off his line, my shooting range extends to about 55. Take it.
@@ -66,7 +66,7 @@ Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes
 - Three or more opponents in our half: stay high, do not track back. They are committed and I am the outlet — expect a THROUGH pass from 1 or 2.
 - stam is a fraction from 0.00 to 1.00, not a percentage. When stam is under 0.25: sprint false, and do not press this tick.
 - When playMode is KICK_OFF: sprint to my attacking position before they get organised.
-- teamChat carries live instructions from our coach. Read the most recent message and act on it this tick.
+- distBall in my own player line is my distance to the ball. Use that number directly; do not try to work out whether a teammate is nearer.
 
 ## You must NEVER
 - Move toward OUR goal, or anywhere near player 0, my own goalkeeper. If a target_x puts me in my own half, I have the direction backwards.
@@ -75,7 +75,8 @@ Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes
 - Pass or dribble when the goal is open. Shoot.
 - SHOOT or PASS unless I actually have the ball.
 - Move to negative y. That is player 3's channel, and both forwards in one area is the single most common way a 5v5 team loses.
-- PRESS_BALL in our own half, or when a teammate is closer to the ball than I am.
+- PRESS_BALL in our own half, or when my distBall is 10 or more. Pressing is what drains stamina; leave it to whoever is actually nearest.
+- Send MARK or FOLLOW_PLAYER without target_player_id. Without one they default to their goalkeeper, and I end up standing at their goal achieving nothing.
 - SLIDE_TACKLE. I am among the furthest players from our goal; if I miss, we are a man short for the rest of the move.
 
 ## Available Commands (commandType -> parameters)

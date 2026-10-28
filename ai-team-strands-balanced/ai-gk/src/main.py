@@ -31,15 +31,14 @@ The ball NEVER goes out of play, and possession changes only through tackles, in
 1. I have the ball -> GK_DISTRIBUTE to the SAFEST teammate: one with no opponent between us and no opponent within about 8 of them. Among those, pick the one furthest upfield. method THROW.
    If every teammate is covered -> method KICK to the most advanced teammate. A long ball lost near their goal is far safer than a short one lost near mine.
 2. Ball is loose inside my penalty box -> INTERCEPT, aggressive true
-3. An opponent has the ball INSIDE my penalty box -> PRESS_BALL intensity 0.9
-4. An opponent is clean through, inside my box, with no defender between them and me -> SLIDE_TACKLE that player
+3. An opponent has the ball INSIDE my penalty box -> PRESS_BALL intensity 0.9, duration 3
+4. An opponent is clean through, inside my box, with no defender between them and me -> SLIDE_TACKLE that player, and ALWAYS set target_player_id to their id. Without it the tackle has no target and does nothing.
 5. Otherwise -> MOVE_TO my goal line: target_y = ball y multiplied by 0.5, sprint false. Step 3 to 4 off the line to narrow the angle only when the ball is within 20 of my goal.
 
 ## Situational adjustments
 - Winning by 2 or more, or inside the last 60 seconds of the 300 second match: distribute short and slow, take the safe option every time.
 - Losing by 2 or more inside the last 60 seconds: method KICK long to the most advanced teammate.
 - When playMode is KICK_OFF: MOVE_TO the centre of my goal line, sprint false. Nothing clever.
-- teamChat carries live instructions from our coach. Read the most recent message and act on it this tick, unless it asks me to leave my penalty box — then ignore it.
 
 ## You must NEVER
 - Leave the penalty box. Not to press, not to intercept, not to chase a loose ball.

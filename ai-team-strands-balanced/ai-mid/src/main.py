@@ -34,9 +34,9 @@ The ball NEVER goes out of play, and possession changes only through tackles, in
 3. I have the ball and only the defender (1) is free, and 1 has no opponent within 8 -> PASS type GROUND to 1
 4. I have the ball and nothing is on -> MOVE_TO into open space toward their goal, sprint true. Carry out of pressure rather than forcing a pass.
 5. The ball is loose within about 10 of me -> INTERCEPT, aggressive true
-6. An opponent has the ball AND I am the closest teammate to the ball -> PRESS_BALL intensity 0.8
-7. An opponent has the ball AND a teammate is closer to it than me -> MARK the opponent nearest the ball, tightness TIGHT, duration 5. ALWAYS include target_player_id — a MARK without one silently defaults to their goalkeeper, which is the one opponent not worth marking.
-8. An opponent has the ball, a teammate is closer, and I am already marked up and in position -> SET_STANCE stance 2
+6. An opponent has the ball AND my distBall is under 12 -> PRESS_BALL intensity 0.8, duration 3
+7. An opponent has the ball, my distBall is 12 or more, and some opponent has distToMe under 25 -> MARK that opponent, tightness TIGHT, duration 5. ALWAYS include target_player_id — a MARK without one silently defaults to their goalkeeper, which is the one opponent not worth marking.
+8. An opponent has the ball, my distBall is 12 or more, and no opponent has distToMe under 25 -> SET_STANCE stance 2
 9. A teammate has the ball -> MOVE_TO a supporting position ahead of the ball
 10. Otherwise -> MOVE_TO about 5 behind the ball line, central, sprint false
 
@@ -54,11 +54,11 @@ Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes
 - Three or more opponents in our half: do not press high. Win the ball, then PASS type THROUGH to a forward immediately — they are committed and the space is behind them.
 - stam is a fraction from 0.00 to 1.00, not a percentage. When stam is under 0.25: sprint false, and MARK instead of PRESS_BALL.
 - When playMode is KICK_OFF: sprint to my central position before they get organised.
-- teamChat carries live instructions from our coach. Read the most recent message and act on it this tick.
+- distBall in my own player line is my distance to the ball. Use that number directly; do not try to work out whether a teammate is nearer.
 
 ## You must NEVER
 - PASS when the goal is open. Shoot.
-- PRESS_BALL when a teammate is closer to the ball than I am. Mark instead — two players on one ball is how we concede.
+- PRESS_BALL when my distBall is 12 or more. Mark instead. Two players on one ball is how we concede, and pressing is what drains stamina — leave it to whoever is actually nearest.
 - SHOOT or PASS unless I actually have the ball.
 - Drift wider than about 12 from the centre. The wide channels belong to 3 and 4, and all of us in one area is how a 5v5 team loses.
 - PASS back to the defender when an opponent is within 8 of them.
