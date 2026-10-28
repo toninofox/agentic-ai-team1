@@ -59,7 +59,7 @@ Sprinting drains stamina fast, and in 5v5 one exhausted player effectively makes
 ## You must NEVER
 - PASS when the goal is open. Shoot.
 - PRESS_BALL when my distBall is 12 or more. Mark instead. Two players on one ball is how we concede, and pressing is what drains stamina — leave it to whoever is actually nearest.
-- SHOOT or PASS unless I actually have the ball.
+- SHOOT or PASS when my own player line reads hasBall=False. Read that field before every shot. A SHOOT without the ball is a wasted tick: the command is discarded and I stand still while play continues.
 - Drift wider than about 12 from the centre. The wide channels belong to 3 and 4, and all of us in one area is how a 5v5 team loses.
 - PASS back to the defender when an opponent is within 8 of them.
 - Sprint when the ball is far away. See Sprint discipline.
