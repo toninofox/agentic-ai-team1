@@ -145,6 +145,44 @@ def dist(pos1: dict, pos2: dict) -> float:
     )
 
 
+def extract_coach_command(prompt_data: dict, team_id: int) -> str | None:
+    """Pull the most recent coach instruction for this team out of the payload.
+
+    Looks for teamChat either at the top level of the invocation payload or
+    nested inside gameState, and accepts the entries in the shapes that have
+    been observed: a bare string, or a dict carrying the text under one of
+    "message"/"text"/"msg" with an optional "teamId"/"team" discriminator.
+    Messages addressed to the other team are skipped; an entry with no team
+    field is treated as addressed to everyone. Returns None when there is
+    nothing to act on, which reproduces the previous (no-coach) prompt exactly.
+    """
+    chat = prompt_data.get("teamChat")
+    if chat is None:
+        chat = prompt_data.get("gameState", {}).get("teamChat")
+    if not isinstance(chat, list) or not chat:
+        return None
+
+    for entry in reversed(chat):
+        if isinstance(entry, str):
+            text = entry.strip()
+            if text:
+                return text
+            continue
+        if not isinstance(entry, dict):
+            continue
+        entry_team = entry.get("teamId", entry.get("team"))
+        if entry_team is not None:
+            if isinstance(entry_team, str):
+                if entry_team.strip().lower() != ("home" if team_id == 0 else "away"):
+                    continue
+            elif entry_team != team_id:
+                continue
+        text = entry.get("message") or entry.get("text") or entry.get("msg")
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    return None
+
+
 def summarize_state(
     game_state: dict,
     team_id: int,
@@ -181,7 +219,15 @@ def summarize_state(
 
     my_goal_x, opp_goal_x = get_goal_positions(team_id)
 
-    lines = [
+    lines = []
+    if coach_command:
+        # Surfaced at the very top so the model treats it as a high-priority
+        # order, matching the "teamChat carries live instructions from our
+        # coach" line in every position prompt.
+        lines.append(f">>> COACH ORDER (obey this tick): {coach_command}")
+        lines.append("")
+
+    lines += [
         f"Time: {game_time:.0f}s | Score: {score.get('home',0)}-{score.get('away',0)} | "
         f"Team: {team_id} ({'HOME' if team_id == 0 else 'AWAY'}) | PlayMode: {play_mode}",
         f"Ball: ({ball_pos.get('x',0):.1f}, {ball_pos.get('y',0):.1f}) held by {ball_status}",

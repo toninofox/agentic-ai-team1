@@ -25,7 +25,11 @@ class FallbackConfig:
 
     # What to do when we have the ball
     possession_action: str = "PASS"
-    """One of: GK_DISTRIBUTE, PASS, SHOOT_OR_PASS, SHOOT_OR_ADVANCE."""
+    """One of: GK_DISTRIBUTE, PASS, PASS_ADVANCED, SHOOT_OR_PASS, SHOOT_OR_ADVANCE.
+
+    PASS targets the nearest teammate; PASS_ADVANCED targets the most advanced
+    teammate (forwards first, then midfield) to match a defender's brief of
+    starting attacks rather than recycling sideways."""
 
     # Default position when nothing else applies
     default_x_factor: float = 0.0
@@ -39,6 +43,14 @@ class FallbackConfig:
     press_distance: float = 20.0
     press_intensity: float = 0.7
     press_duration: int = 3
+    press_only_if_closest: bool = False
+    """If True, only PRESS_BALL when I am the teammate nearest the ball.
+
+    Without this, every position presses any loose ball inside press_distance.
+    For the GK that means being dragged press_distance units off the line on
+    any LLM parse failure — exactly when nobody is watching. For outfielders
+    it is how two players chase one ball and leave a man free. Setting this,
+    plus a small press_distance, keeps the fallback's pressing sane."""
 
     # Shoot threshold (distance to opp goal)
     shoot_threshold: float = 25.0
@@ -80,15 +92,22 @@ class FallbackConfig:
 GK_CONFIG = FallbackConfig(
     possession_action="GK_DISTRIBUTE",
     default_x_factor=0.9, default_x_ref="my_goal", default_y="track_ball",
+    # The keeper must not be pulled off his line by the fallback: a tight
+    # press_distance plus closest-only pressing keeps him in the box, matching
+    # the "NEVER leave the penalty box" rule in the GK system prompt.
+    press_distance=8.0, press_only_if_closest=True,
     default_stance=2,
     last_resort_command_type="SET_STANCE", last_resort_params={"stance": 2},
 )
 
 DEF_CONFIG = FallbackConfig(
-    possession_action="PASS",
+    # Prefer the most advanced free teammate (forwards, then mid), matching the
+    # DEF system prompt, instead of blindly passing to the nearest body.
+    possession_action="PASS_ADVANCED",
     pass_exclude_ids=[0],  # don't pass back to GK
     default_x_factor=0.6, default_x_ref="my_goal", default_y=0,
     mark_threshold=30.0, mark_tightness="TIGHT",
+    press_only_if_closest=True,
     default_stance=2,
     last_resort_command_type="SET_STANCE", last_resort_params={"stance": 2},
 )
@@ -96,7 +115,7 @@ DEF_CONFIG = FallbackConfig(
 MID_CONFIG = FallbackConfig(
     possession_action="SHOOT_OR_PASS",
     default_x_factor=0.5, default_x_ref="ball_x", default_y="track_ball_30",
-    press_distance=20.0, press_intensity=0.6,
+    press_distance=20.0, press_intensity=0.6, press_only_if_closest=True,
     shoot_threshold=25.0, shoot_aim="TR", shoot_power=0.8,
     default_stance=0,
     last_resort_command_type="PRESS_BALL", last_resort_params={"intensity": 0.5},
@@ -108,7 +127,7 @@ FWD1_CONFIG = FallbackConfig(
     advance_x_factor=0.6, advance_y=-8, advance_sprint=True,
     support_x_factor=0.5, support_y=-10, support_sprint=True,
     default_x_factor=0.4, default_x_ref="opp_goal", default_y=-8,
-    press_distance=20.0, press_intensity=0.7,
+    press_distance=20.0, press_intensity=0.7, press_only_if_closest=True,
     shoot_aim="TR", shoot_power=0.9,
     default_stance=1,
     last_resort_command_type="PRESS_BALL", last_resort_params={"intensity": 0.6},
@@ -120,7 +139,7 @@ FWD2_CONFIG = FallbackConfig(
     advance_x_factor=0.6, advance_y=8, advance_sprint=True,
     support_x_factor=0.5, support_y=10, support_sprint=True,
     default_x_factor=0.4, default_x_ref="opp_goal", default_y=8,
-    press_distance=20.0, press_intensity=0.7,
+    press_distance=20.0, press_intensity=0.7, press_only_if_closest=True,
     shoot_aim="BL", shoot_power=0.9,
     default_stance=1,
     last_resort_command_type="PRESS_BALL", last_resort_params={"intensity": 0.6},
@@ -189,8 +208,14 @@ def build_fallback(cfg: FallbackConfig) -> Callable[[dict, int, int], list[dict]
         # --- Press if close to ball and opponent has it ---
         _, _, we_have_ball = get_possession_info(ball, players, team_id)
         if not we_have_ball and dist(pos, ball_pos) < cfg.press_distance:
-            return [_cmd("PRESS_BALL", my_player_id, team_id,
-                         {"intensity": cfg.press_intensity}, duration=cfg.press_duration)]
+            # Only the closest teammate presses, when the config asks for it —
+            # otherwise the GK leaves his line and outfielders double up on the
+            # ball. See FallbackConfig.press_only_if_closest.
+            if not cfg.press_only_if_closest or _i_am_closest_to_ball(
+                players, team_id, my_player_id, pos, ball_pos
+            ):
+                return [_cmd("PRESS_BALL", my_player_id, team_id,
+                             {"intensity": cfg.press_intensity}, duration=cfg.press_duration)]
 
         # --- Default position ---
         tx, ty = _default_pos(cfg, my_goal_x, opp_goal_x, ball_pos)
@@ -207,6 +232,21 @@ def build_fallback(cfg: FallbackConfig) -> Callable[[dict, int, int], list[dict]
 def _cmd(cmd_type: str, pid: int, tid: int, params: dict, duration: int = 0) -> dict:
     return {"commandType": cmd_type, "playerId": pid, "teamId": tid,
             "parameters": params, "duration": duration}
+
+
+def _i_am_closest_to_ball(players, team_id, my_player_id, my_pos, ball_pos) -> bool:
+    """True when no teammate is closer to the ball than I am.
+
+    Ties (including the degenerate single-player case) resolve in my favour so
+    at least one player always presses.
+    """
+    my_d = dist(my_pos, ball_pos)
+    for p in players:
+        if not _is_my_team(p, team_id) or _player_idx(p) == my_player_id:
+            continue
+        if dist(p.get("position", {"x": 0, "y": 0}), ball_pos) < my_d:
+            return False
+    return True
 
 
 def _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, opp_goal_x):
@@ -227,6 +267,23 @@ def _on_ball(cfg, game_state, players, team_id, my_player_id, pos, my_goal_x, op
             target = min(teammates, key=lambda p: dist(p.get("position", {}), pos))
             return [_cmd("PASS", my_player_id, team_id,
                          {"target_player_id": _player_idx(target), "type": "GROUND"})]
+        return [_cmd("PASS", my_player_id, team_id,
+                     {"target_player_id": 2, "type": "GROUND"})]
+
+    if cfg.possession_action == "PASS_ADVANCED":
+        exclude = set(cfg.pass_exclude_ids) | {my_player_id}
+        teammates = [p for p in players if _is_my_team(p, team_id) and _player_idx(p) not in exclude]
+        if teammates:
+            # Most advanced = nearest the opponent goal in x. Among equally
+            # advanced players the preference order (forwards 3/4 before mid 2)
+            # falls out of the goal-distance sort for any sane formation, and a
+            # THROUGH ball to a player ahead of me matches the prompt.
+            target = min(teammates, key=lambda p: abs(p.get("position", {}).get("x", 0) - opp_goal_x))
+            tpos = target.get("position", {"x": 0, "y": 0})
+            ahead = abs(tpos.get("x", 0) - opp_goal_x) < abs(pos.get("x", 0) - opp_goal_x)
+            return [_cmd("PASS", my_player_id, team_id,
+                         {"target_player_id": _player_idx(target),
+                          "type": "THROUGH" if ahead else "GROUND"})]
         return [_cmd("PASS", my_player_id, team_id,
                      {"target_player_id": 2, "type": "GROUND"})]
 

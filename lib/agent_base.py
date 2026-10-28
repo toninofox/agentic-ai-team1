@@ -6,7 +6,7 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from parsing import parse_commands
-from state import summarize_state
+from state import summarize_state, extract_coach_command
 from fallback import FallbackConfig, build_last_resort
 
 
@@ -83,9 +83,16 @@ def create_invoke_handler(
             my_players = prompt_data.get("myPlayers", [my_player_id])
             effective_pid = my_players[0] if my_players else my_player_id
 
+            # Live coach order, if any, read from teamChat in the payload.
+            # The prompts tell the model to obey it, so it must actually reach
+            # the prompt — previously the parameter existed but was never fed.
+            coach_command = extract_coach_command(prompt_data, team_id)
+
             state_summary = summarize_state(
-                game_state, team_id, effective_pid, position_label
+                game_state, team_id, effective_pid, position_label, coach_command
             )
+            if coach_command:
+                log.info(f"{position_label} coach order this tick: {coach_command[:200]}")
             log.info(f"{position_label} agent invoked for team {team_id}, controlling player {effective_pid}")
 
             response = agent(state_summary)

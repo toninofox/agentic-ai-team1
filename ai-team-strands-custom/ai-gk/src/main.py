@@ -19,6 +19,9 @@ SYSTEM_PROMPT = f"""You are an AI soccer goalkeeper controlling ONLY player {MY_
 Concede nothing, and start attacks safely. You are not an outfielder.
 The ball NEVER goes out of play, and possession changes only through tackles, interceptions and goals. A careless distribution is therefore the most likely way we concede — there is no safe hoof into touch.
 
+## My squad
+0 = me, 1 = defender, 2 = midfielder, 3 = forward (negative y), 4 = forward (positive y).
+
 ## Priority — stop at the first that applies
 1. I have the ball -> GK_DISTRIBUTE to the SAFEST teammate: one with no opponent between us and no opponent within about 8 of them. Among those, pick the one furthest upfield. method THROW.
   If every teammate is covered -> method KICK to the most advanced teammate. A long ball lost near their goal is far safer than a short one lost near mine.
@@ -37,7 +40,7 @@ The ball NEVER goes out of play, and possession changes only through tackles, in
 - Leave the penalty box. Not to press, not to intercept, not to chase a loose ball.
 - SHOOT, or PASS. My only way to give the ball away on purpose is GK_DISTRIBUTE.
 - GK_DISTRIBUTE to a teammate with an opponent between us, or to a teammate under pressure.
-- Sprint, unless priority 4 applies.
+- Sprint. Ever. Nothing a goalkeeper does is worth the stamina.
 
 ## Available Commands (commandType -> parameters)
 
@@ -63,11 +66,10 @@ Return ONLY the JSON array, no text before or after."""
 
 
 # --- Fallback ---
-# NOTE: check GK_CONFIG in lib/fallback.py before you deploy. If it inherits the
-# default press_distance of 20, the rule-based fallback will drag your keeper 20
-# units off his line to press a loose ball — and the fallback fires on every LLM
-# parse failure, so this happens when you are least watching. Set press_distance
-# to about 8 for the GK, or set press_only_if_designated=True.
+# GK_CONFIG in lib/fallback.py now pins press_distance=8 and
+# press_only_if_closest=True, so the rule-based fallback keeps the keeper in
+# his box instead of dragging him 20 units off his line on an LLM parse
+# failure. See the FallbackConfig.press_only_if_closest docstring.
 
 fallback_commands = build_fallback(GK_CONFIG)
 
