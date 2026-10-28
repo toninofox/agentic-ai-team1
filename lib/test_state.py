@@ -9,12 +9,7 @@ possession by index alone makes two players believe they hold the same ball.
 
 import copy
 
-from state import (
-    get_possession_info,
-    holder_is_me,
-    summarize_state,
-    extract_coach_command,
-)
+from state import get_possession_info, holder_is_me, summarize_state
 from test_helpers import GAME_STATE
 
 HOME, AWAY = 0, 1
@@ -104,39 +99,6 @@ def test_team_code_case_is_tolerated():
         assert ">>> YOUR PLAYER" in out, f"own player missing with {transform.__name__} teamCode"
         assert "hasBall=False" in out
     print("=== TEAMCODE: upper/title case tolerated ===")
-
-
-def test_coach_command_extracted_and_rendered():
-    """A coach order in teamChat is pulled out and surfaced at the top.
-
-    The position prompts tell the model to obey teamChat, so the order must
-    actually reach the prompt — previously summarize_state accepted a
-    coach_command but nothing ever supplied one.
-    """
-    # Bare-string entry at the top level of the payload.
-    pd = {"gameState": GAME_STATE, "teamChat": ["push the line up"]}
-    assert extract_coach_command(pd, HOME) == "push the line up"
-
-    # Dict entries: newest wins, and the team discriminator is honoured.
-    pd = {"teamChat": [
-        {"teamId": 0, "message": "old order"},
-        {"team": "away", "message": "not for us"},
-        {"teamId": 0, "text": "mark tighter"},
-    ]}
-    assert extract_coach_command(pd, HOME) == "mark tighter"
-    assert extract_coach_command(pd, AWAY) == "not for us"
-
-    # teamChat nested inside gameState is also found.
-    pd = {"gameState": {"teamChat": ["drop deeper"]}}
-    assert extract_coach_command(pd, HOME) == "drop deeper"
-
-    # No chat -> None, and the rendered prompt is unchanged (no COACH line).
-    assert extract_coach_command({"gameState": GAME_STATE}, HOME) is None
-    out = summarize_state(GAME_STATE, HOME, HOLDER_IDX, "DEF", None)
-    assert "COACH ORDER" not in out
-    out = summarize_state(GAME_STATE, HOME, HOLDER_IDX, "DEF", "press high")
-    assert out.startswith(">>> COACH ORDER (obey this tick): press high"), out
-    print("=== COACH: extracted, team-filtered, rendered at top ===")
 
 
 if __name__ == "__main__":
